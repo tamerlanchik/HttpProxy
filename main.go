@@ -34,7 +34,9 @@ var root = &cli.Command{
 //		-timeout
 //		-proto
 //	reverse	- run reverse tool
-//		list [n=20] - print latest n requests
+//		list - print latest n requests
+//			-n = 20
+//			-v - print all columns
 //		repeat [id] - repeat [id] request
 //		delete [id] - delete [id] request
 
@@ -71,14 +73,15 @@ var cmdReverse = &cli.Command{
 
 type ReverseListArgs struct {
 	cli.Helper
-	N int `cli:"n" usage:"Number of last requests to display, 0 - all" dft:"20"`
+	N int `cli:"n" usage:"Number of last requests to display" dft:"20"`
+	V bool `cli:"v" usage:"Verbose output" dft:"false"`
 }
 var cmdReverseList = &cli.Command{
 	Name:               "list",
 	Desc:               "Display the list of the latest requests",
 	Fn:                 func(ctx *cli.Context) error {
 		args := ctx.Argv().(*ReverseListArgs)
-		err := reverse.RunList(args.N)
+		err := reverse.RunList(args.N, args.V)
 		return err
 	},
 	Argv:               func() interface{} {return new(ReverseListArgs)},

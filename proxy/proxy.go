@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"crypto/tls"
 	"database/sql"
 	"fmt"
@@ -45,7 +46,10 @@ func Run(port string, pemPath, keyPath string, timeout int, proto string) error 
 }
 
 func handle(w http.ResponseWriter, r* http.Request) {
-	//fmt.Print(r.URL.Path[1:] + ": ")
+	//	we cannot read from r.Body twice
+	//	so we should make a dance with it
+	body, err := ioutil.ReadAll(r.Body)
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 	if r.Method == http.MethodConnect {
 		HandleTunnel(w, r)
 	} else {
@@ -53,7 +57,7 @@ func handle(w http.ResponseWriter, r* http.Request) {
 	}
 	query := `INSERT INTO Request(method, proto_schema, dest, body, header, created) 
 				VALUES ($1, $2, $3, $4, $5, $6);`
-	body, err := ioutil.ReadAll(r.Body)
+	//body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		return
