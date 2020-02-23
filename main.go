@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/mkideal/cli"
 	"os"
+	"proxy/db"
 	"proxy/proxy"
+	"proxy/reverse"
 	"time"
 )
 
@@ -30,10 +32,11 @@ var root = &cli.Command{
 //		-pem
 //		-key
 //		-timeout
+//		-proto
 //	reverse	- run reverse tool
 //		list [n=20] - print latest n requests
 //		repeat [id] - repeat [id] request
-//		-d [id] - delete [id] request
+//		delete [id] - delete [id] request
 
 type ProxyArgs struct {
 	cli.Helper
@@ -41,6 +44,7 @@ type ProxyArgs struct {
 	Pem string `cli:"pem" usage:"Path to PEM file" dft:"keys/server.pem"`
 	Key string `cli:"key" usage:"Path to KEY file" dft:"keys/server.key"`
 	Timeout int `cli:"t,timeout" usage:"Timeout for tls-tunnel, ms" fdt:"1000"`
+	Proto string `cli:"proto" usage:"Used protocol: http-only or https+http" dft:"http"`
 }
 var cmdProxy = &cli.Command{
 	Name:               "proxy",
@@ -49,7 +53,7 @@ var cmdProxy = &cli.Command{
 	Fn:                 func(ctx *cli.Context) error {
 		argv := ctx.Argv().(*ProxyArgs)
 
-		err := proxy.Run(argv.Port, argv.Pem, argv.Key, argv.Timeout)
+		err := proxy.Run(argv.Port, argv.Pem, argv.Key, argv.Timeout, argv.Proto)
 		fmt.Println(err)
 		return nil
 	},
@@ -73,10 +77,9 @@ var cmdReverseList = &cli.Command{
 	Name:               "list",
 	Desc:               "Display the list of the latest requests",
 	Fn:                 func(ctx *cli.Context) error {
-		//_ := ctx.Argv().(*ProxyArgs)
-
-		fmt.Println("List")
-		return nil
+		args := ctx.Argv().(*ReverseListArgs)
+		err := reverse.RunList(args.N)
+		return err
 	},
 	Argv:               func() interface{} {return new(ReverseListArgs)},
 }
@@ -87,12 +90,11 @@ type ReverseRepeatArgs struct {
 }
 var cmdReverseRepeat = &cli.Command{
 	Name:               "repeat",
-	Desc:               "Repea the specified request",
+	Desc:               "Repeat the specified request",
 	Fn:                 func(ctx *cli.Context) error {
-		//_ := ctx.Argv().(*ProxyArgs)
-
-		fmt.Println("List")
-		return nil
+		args := ctx.Argv().(*ReverseRepeatArgs)
+		err := reverse.RunRepeat(args.Id)
+		return err
 	},
 	Argv:               func() interface{} {return new(ReverseRepeatArgs)},
 }
@@ -114,7 +116,21 @@ var cmdReverseDelete = &cli.Command{
 }
 
 func main() {
-	cliRoot := cli.Root(root, cli.Tree(cmdProxy), cli.Tree(cmdReverse, cli.Tree(cmdReverseList)))
+	cliRoot := cli.Root(root,
+		cli.Tree(cmdProxy),
+		cli.Tree(cmdReverse,
+			cli.Tree(cmdReverseList),
+			cli.Tree(cmdReverseRepeat),
+			cli.Tree(cmdReverseDelete)))
+
+	db, err := db.Connect()
+	if err != nil {
+		fmt.Println("Cannot connect to database! ", err.Error())
+		return
+	} else {
+		fmt.Println("Db inited")
+		db.Close()
+	}
 
 	if nil != cliRoot.Run(os.Args[1:]) {
 		fmt.Errorf("Error: %s", os.Stderr)
